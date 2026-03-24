@@ -1,6 +1,6 @@
 # Minsoo Lee
 # This program will conduct cross-dependence (CD) testing for environmental data across 43
-# countries between 1990 to 2019 based on bias-corrected CD testing in Pesaran (2020)
+# countries between 1990 to 2019
 
 
 import pandas as pd
