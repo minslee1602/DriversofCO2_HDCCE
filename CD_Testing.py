@@ -43,17 +43,17 @@ print(results.summary)
 resid = results.resids.reset_index()
 resid.columns = ['Country.Name', 'Year', 'resid']
 
-# reshape residuals to wider form for correlation matrix
+# Reshape residuals to wider form for correlation matrix
 resid_wide = resid.pivot(index='Year', columns='Country.Name', values='resid').sort_index()
 
-# correlation matrix across countries
+# Correlation matrix across countries
 corr_matrix = resid_wide.corr()
 
 # Determine N countries and T years for calculation in Pesaran CD statistic
 N = resid_wide.shape[1]
 T = resid_wide.shape[0]
 
-# upper triangle correlations only
+# Upper triangle correlations only
 upper_idx = np.triu_indices(N, k=1)
 rho_ij = corr_matrix.to_numpy()[upper_idx]
 
@@ -63,12 +63,12 @@ rho_ij = corr_matrix.to_numpy()[upper_idx]
 # Pesaran CD statistic
 CD = np.sqrt(2 * T / (N * (N - 1))) * np.sum(rho_ij) # i think this is correct?
 
-# two-sided p-value to evaluate test statistic
+# Two-sided p-value to evaluate test statistic
 p_value = 2 * (1 - norm.cdf(abs(CD)))
 
 print(corr_matrix.iloc[:5, :5])
 
-# plot a subset of the residuals
+# Plot residual averages
 avg_resid = resid_wide.mean(axis=1)
 
 plt.plot(avg_resid)
