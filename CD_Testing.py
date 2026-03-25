@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from linearmodels.panel import PanelOLS
 from scipy.stats import norm
+from statsmodels.stats.outliers_influence import variance_inflation_factor
 import matplotlib.pyplot as plt
 
 # Load data
@@ -22,6 +23,35 @@ df = df.set_index(['Country.Name', 'Year']).sort_index() # set country name (i) 
 y = df['carbon_emissions_pc']
 
 # These variables have been split into production and consumption side to avoid multicollinearity
+
+# Consumption model
+# X = df[[
+#     'gdp_pc',
+#     'gdpsq_pc',
+#     'fd_index',
+#     'coal_consumption_pc',
+#     'oil_consumption_pc',
+#     'gas_consumption_pc',
+#     'renewables_consumption_pc' # replace with components
+# ]] # Dummy variables are absorbed
+# Higher R^2 value, reject H0 with p = 0.03
+
+# Production model
+# X = df[[
+#     'gdp_pc',
+#     'gdpsq_pc',
+#     'fd_index',
+#     'coal_production_pc',
+#     'oil_production_pc',
+#     'gas_production_pc',
+#     'solar_production_pc',
+#     'wind_production_pc',
+#     'hydro_production_pc',
+#     'other_renewables_production_pc'
+# ]] # Dummy variables are absorbed
+# Lower R^2 value, reject H0 with p = 0.00
+
+# Combined
 X = df[[
     'gdp_pc',
     'gdpsq_pc',
@@ -29,10 +59,34 @@ X = df[[
     'coal_consumption_pc',
     'oil_consumption_pc',
     'gas_consumption_pc',
-    'renewables_consumption_pc'
-]] # Dummy variables are absorbed
+    'renewables_consumption_pc',
+    'coal_production_pc',
+    'oil_production_pc',
+    'gas_production_pc',
+    'solar_production_pc',
+    'wind_production_pc',
+    'hydro_production_pc',
+    'other_renewables_production_pc' ]]
 
+# VIF Test for multicollinearity
 
+# Demean by entity and time
+X_demeaned = X.copy()
+X_demeaned = X_demeaned - X_demeaned.groupby(level=0).transform('mean') # entity
+X_demeaned = X_demeaned - X_demeaned.groupby(level=1).transform('mean') # time
+
+# Create dataframe, and calculate VIF for each regressor
+vif_data = pd.DataFrame()
+vif_data["variable"] = X_demeaned.columns
+vif_data["VIF"] = [
+    variance_inflation_factor(X_demeaned.values, i)
+    for i in range(X_demeaned.shape[1])
+]
+
+print(vif_data)
+
+# Results show low multicollinearity, but this might be due to high heterogeneity in the data (Australia produces more
+# coal that it consumes, Japan consumes more coal than it produces)
 
 # Fit model using OLS
 model = PanelOLS(y, X, entity_effects=True, time_effects=True)
@@ -81,15 +135,3 @@ print("N =", N)
 print("T =", T)
 print("CD statistic =", CD)
 print("p-value =", p_value)
-
-
-
-
-
-
-
-
-
-
-
-
