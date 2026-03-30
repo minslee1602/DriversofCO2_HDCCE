@@ -1,6 +1,6 @@
 # Minsoo Lee
 # This program will conduct cross-dependence (CD) testing for environmental data across 43
-# countries between 1990 to 2019
+# countries between 1990 to 2019, and tests the strength of cross dependence
 
 
 import pandas as pd
@@ -21,35 +21,6 @@ df = df.set_index(['Country.Name', 'Year']).sort_index() # set country name (i) 
 
 # Estimate model
 y = df['carbon_emissions_pc']
-
-# These variables have been split into production and consumption side to avoid multicollinearity
-
-# Consumption model
-# X = df[[
-#     'gdp_pc',
-#     'gdpsq_pc',
-#     'fd_index',
-#     'coal_consumption_pc',
-#     'oil_consumption_pc',
-#     'gas_consumption_pc',
-#     'renewables_consumption_pc' # replace with components
-# ]] # Dummy variables are absorbed
-# Higher R^2 value, reject H0 with p = 0.03
-
-# Production model
-# X = df[[
-#     'gdp_pc',
-#     'gdpsq_pc',
-#     'fd_index',
-#     'coal_production_pc',
-#     'oil_production_pc',
-#     'gas_production_pc',
-#     'solar_production_pc',
-#     'wind_production_pc',
-#     'hydro_production_pc',
-#     'other_renewables_production_pc'
-# ]] # Dummy variables are absorbed
-# Lower R^2 value, reject H0 with p = 0.00
 
 # Combined
 X = df[[
@@ -122,16 +93,56 @@ p_value = 2 * (1 - norm.cdf(abs(CD)))
 
 print(corr_matrix.iloc[:5, :5])
 
-# Plot residual averages
-avg_resid = resid_wide.mean(axis=1)
+plt.figure(figsize=(10, 6))
 
-plt.plot(avg_resid)
-plt.title("Average residual across countries")
+for col in resid_wide.columns:
+    plt.plot(resid_wide.index, resid_wide[col], label=col)
+
+plt.title("Model Residuals across countries")
 plt.xlabel("Year")
 plt.ylabel("Residual")
-plt.show()
 
+plt.legend(bbox_to_anchor=(1.02, 1), loc='upper left', ncol=2, fontsize=8)
+plt.tight_layout()
+plt.show()
 print("N =", N)
 print("T =", T)
 print("CD statistic =", CD)
 print("p-value =", p_value)
+
+# Bailey, Kapetanios, and Pesaran (2019):
+# We already have the residual correlation matrix
+
+# Full correlation matrix as numpy array
+R = corr_matrix.to_numpy()
+
+# Threshold choice
+threshold = 2 * np.sqrt(np.log(N)) / np.sqrt(T)
+
+# Construct thresholded correlation matrix Delta_tilde
+delta = np.zeros((N, N))
+np.fill_diagonal(delta, 1)  # set diagonal to 1
+
+for i in range(N):
+    for j in range(N):
+        if i != j:
+            if abs(R[i, j]) > threshold:
+                delta[i, j] = R[i, j]
+            else:
+                delta[i, j] = 0
+
+
+tau = np.ones((N, 1))
+quad_form = (tau.T @ delta @ tau).item()
+
+alpha = np.log(quad_form) / (2 * np.log(N))
+
+print("Estimated alpha =", alpha)
+
+
+
+
+
+
+
+
