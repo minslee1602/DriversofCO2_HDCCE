@@ -110,8 +110,7 @@ print("T =", T)
 print("CD statistic =", CD)
 print("p-value =", p_value)
 
-# Bailey, Kapetanios, and Pesaran (2019):
-# We already have the residual correlation matrix
+# Test for strength of cross-dependence (Bailey et al 2019)
 
 # Full correlation matrix as numpy array
 R = corr_matrix.to_numpy()
@@ -119,9 +118,9 @@ R = corr_matrix.to_numpy()
 # Threshold choice
 threshold = 2 * np.sqrt(np.log(N)) / np.sqrt(T)
 
-# Construct thresholded correlation matrix Delta_tilde
+# Construct thresholded correlation matrix represented by delta with diagonal of 1
 delta = np.zeros((N, N))
-np.fill_diagonal(delta, 1)  # set diagonal to 1
+np.fill_diagonal(delta, 1) 
 
 for i in range(N):
     for j in range(N):
@@ -131,10 +130,13 @@ for i in range(N):
             else:
                 delta[i, j] = 0
 
-
+# Construct tau as vector of ones
 tau = np.ones((N, 1))
+
+# Quadratic form of tau used in computation of alpha statistic
 quad_form = (tau.T @ delta @ tau).item()
 
+# Calculate measure of strength of cross-dependence
 alpha = np.log(quad_form) / (2 * np.log(N))
 
 print("Estimated alpha =", alpha)
