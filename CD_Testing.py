@@ -86,7 +86,7 @@ rho_ij = corr_matrix.to_numpy()[upper_idx]
 # rho_ij = rho_ij[~np.isnan(rho_ij)]
 
 # Pesaran CD statistic
-CD = np.sqrt(2 * T / (N * (N - 1))) * np.sum(rho_ij) # i think this is correct?
+CD = np.sqrt(2 * T / (N * (N - 1))) * np.sum(rho_ij)
 
 # Two-sided p-value to evaluate test statistic
 p_value = 2 * (1 - norm.cdf(abs(CD)))
@@ -120,7 +120,7 @@ threshold = 2 * np.sqrt(np.log(N)) / np.sqrt(T)
 
 # Construct thresholded correlation matrix represented by delta with diagonal of 1
 delta = np.zeros((N, N))
-np.fill_diagonal(delta, 1) 
+np.fill_diagonal(delta, 1)
 
 for i in range(N):
     for j in range(N):
@@ -140,11 +140,3 @@ quad_form = (tau.T @ delta @ tau).item()
 alpha = np.log(quad_form) / (2 * np.log(N))
 
 print("Estimated alpha =", alpha)
-
-
-
-
-
-
-
-
