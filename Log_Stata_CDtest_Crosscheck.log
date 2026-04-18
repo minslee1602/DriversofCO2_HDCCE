@@ -1,0 +1,218 @@
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\Nebula PC\OneDrive\Desktop\HonoursProject\Log_Stata_CDtest_Crosscheck.log
+  log type:  text
+ opened on:  18 Apr 2026, 15:36:29
+
+. 
+. clear all
+
+. set more off
+
+. 
+. * Import Excel file
+. import excel "Cabon_Emm_disaggregate.xlsx", firstrow clear
+(23 vars, 1,290 obs)
+
+. 
+. * Check data
+. describe
+
+Contains data
+ Observations:         1,290                  
+    Variables:            23                  
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+CountryName     str18   %18s                  Country.Name
+CountryCode     str3    %9s                   Country.Code
+OECD            str1    %9s                   OECD
+EU              str1    %9s                   EU
+G7              str1    %9s                   G7
+BRICS           str1    %9s                   BRICS
+CarbonTax       str1    %9s                   Carbon.Tax
+Year            int     %td..                 Year
+carbon_emissi~c double  %10.0g                carbon_emissions_pc
+gdp_pc          double  %10.0g                gdp_pc
+gdpsq_pc        double  %10.0g                gdpsq_pc
+fd_index        double  %10.0g                fd_index
+coal_producti~c double  %10.0g                coal_production_pc
+oil_productio~c double  %10.0g                oil_production_pc
+gas_productio~c double  %10.0g                gas_production_pc
+coal_consumpt~c double  %10.0g                coal_consumption_pc
+oil_consumpti~c double  %10.0g                oil_consumption_pc
+gas_consumpti~c double  %10.0g                gas_consumption_pc
+solar_product~c double  %10.0g                solar_production_pc
+wind_producti~c double  %10.0g                wind_production_pc
+hydro_product~c double  %10.0g                hydro_production_pc
+other_renewab~c double  %10.0g                other_renewables_production_pc
+renewables_co~c double  %10.0g                renewables_consumption_pc
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Sorted by: 
+     Note: Dataset has changed since last saved.
+
+. summarize
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+ CountryName |          0
+ CountryCode |          0
+        OECD |          0
+          EU |          0
+          G7 |          0
+-------------+---------------------------------------------------------
+       BRICS |          0
+   CarbonTax |          0
+        Year |      1,290       16254    3162.632      10958      21550
+carbon_emi~c |      1,290    1.951282    .6694381  -.4094458   3.471378
+      gdp_pc |      1,290    9.866685    .9732128   6.270796   11.62998
+-------------+---------------------------------------------------------
+    gdpsq_pc |      1,290    98.29789    18.44676   39.32288   135.2564
+    fd_index |      1,290    3.880818    .5798548  -.1953372    4.60517
+coal_produ~c |      1,290    7.469431    7.753329          0   18.83691
+oil_produc~c |      1,290    4.888112    7.487717          0   19.85476
+gas_produc~c |      1,290    6.069006    7.619637          0   19.27332
+-------------+---------------------------------------------------------
+coal_consu~c |      1,290    15.04664    2.581064          0     17.642
+oil_consum~c |      1,290    16.07892    2.590874          0    18.2014
+gas_consum~c |      1,290    14.62625    3.660165          0   17.27327
+solar_prod~c |      1,290    4.944571    4.490007  -.4306674   13.49004
+wind_produ~c |      1,290     7.78971    4.741898          0   14.83708
+-------------+---------------------------------------------------------
+hydro_prod~c |      1,290     12.5316    3.102803          0   17.54498
+other_rene~c |      1,290    10.17593    3.792038          0   16.65099
+renewables~c |      1,290    7.603944    2.132752          0   11.92935
+
+. 
+. * Panel Setup
+. encode CountryName, gen(country_id)
+
+. 
+. * Declare panel
+. xtset country_id Year
+
+Panel variable: country_id (strongly balanced)
+ Time variable: Year, 1/1/1990 to 1/1/2019, but with gaps
+         Delta: 1 day
+
+. 
+. * Install packages
+. capture which xtcsd
+
+. if _rc ssc install xtcsd
+
+. 
+. capture which xtcse2
+
+. if _rc net install xtdcce2, from("https://janditzen.github.io/xtdcce2/")
+
+. 
+. * Convert date variable to a simple year integer
+. gen year_int = year(Year)
+
+. 
+. * Declare the panel using the integer year
+. xtset country_id year_int
+
+Panel variable: country_id (strongly balanced)
+ Time variable: year_int, 1990 to 2019
+         Delta: 1 unit
+
+. 
+. * Estimate fixed effects model
+. xtreg carbon_emissions_pc ///
+>     gdp_pc gdpsq_pc fd_index ///
+>     coal_consumption_pc oil_consumption_pc gas_consumption_pc ///
+>     renewables_consumption_pc ///
+>     coal_production_pc oil_production_pc gas_production_pc ///
+>     solar_production_pc wind_production_pc hydro_production_pc ///
+>     other_renewables_production_pc, fe
+
+Fixed-effects (within) regression               Number of obs     =      1,290
+Group variable: country_id                      Number of groups  =         43
+
+R-squared:                                      Obs per group:
+     Within  = 0.8374                                         min =         30
+     Between = 0.3582                                         avg =       30.0
+     Overall = 0.3567                                         max =         30
+
+                                                F(14, 1233)       =     453.72
+corr(u_i, Xb) = -0.9313                         Prob > F          =     0.0000
+
+------------------------------------------------------------------------------------------------
+           carbon_emissions_pc | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------------------------+----------------------------------------------------------------
+                        gdp_pc |   .5144628   .0835012     6.16   0.000     .3506426    .6782829
+                      gdpsq_pc |  -.0173066    .004624    -3.74   0.000    -.0263784   -.0082347
+                      fd_index |  -.0137059   .0071805    -1.91   0.057    -.0277932    .0003814
+           coal_consumption_pc |   .2082169   .0063903    32.58   0.000     .1956797     .220754
+            oil_consumption_pc |    .432308    .016775    25.77   0.000     .3993974    .4652187
+            gas_consumption_pc |   .0186909   .0018669    10.01   0.000     .0150283    .0223535
+     renewables_consumption_pc |  -.0359664   .0045863    -7.84   0.000    -.0449642   -.0269686
+            coal_production_pc |  -.0121811   .0063087    -1.93   0.054     -.024558    .0001958
+             oil_production_pc |     .05026   .0126942     3.96   0.000     .0253553    .0751648
+             gas_production_pc |   .0186665    .004607     4.05   0.000      .009628     .027705
+           solar_production_pc |  -.0028906   .0009059    -3.19   0.001    -.0046679   -.0011133
+            wind_production_pc |  -.0004669   .0010013    -0.47   0.641    -.0024313    .0014975
+           hydro_production_pc |   .0049102   .0036434     1.35   0.178    -.0022377    .0120581
+other_renewables_production_pc |  -.0039289   .0012066    -3.26   0.001    -.0062961   -.0015617
+                         _cons |  -11.72588    .331945   -35.32   0.000    -12.37712   -11.07464
+-------------------------------+----------------------------------------------------------------
+                       sigma_u |  1.4792057
+                       sigma_e |  .06720552
+                           rho |  .99794005   (fraction of variance due to u_i)
+------------------------------------------------------------------------------------------------
+F test that all u_i=0: F(42, 1233) = 443.27                  Prob > F = 0.0000
+
+. 
+. * CD-test and test of strength of CD
+. predict epsilon2, e
+
+. xtcsd, pesaran abs
+ 
+ 
+Pesaran's test of cross sectional independence =     3.588, Pr = 0.0003
+ 
+Average absolute value of the off-diagonal elements =     0.386
+
+. xtcse2 epsilon2
+Cross-Sectional Dependence Exponent Estimation and Test
+
+Panel Variable (i): country_id
+Time Variable (t): year_int
+
+Estimation of Cross-Sectional Exponent (alpha)
+----------------------------------------------------------------
+       variable|     alpha   Std. Err.    [95% Conf. Interval]
+---------------+------------------------------------------------
+       epsilon2|  .6811347   .0366308     .6093398    .7529297
+----------------------------------------------------------------
+0.5 <= alpha < 1 implies strong cross-sectional dependence.
+
+Testing for cross-sectional dependence (CSD)
+     CD CDw CDw+                       CD*
+ H0: weak cross-section dependence     independence in presence of factors
+ H1: strong cross-section dependence   weak dependence in presence of factors
+------------------------------------------------------------------------
+               |    CD            CDw           CDw+          CD*
+---------------+--------------------------------------------------------
+epsilon2       |     3.59       -2.16       1843.41          4.99
+               |  (0.000)     (0.030)       (0.000)       (0.000)
+------------------------------------------------------------------------
+p-values in parenthesis.
+References
+  CD:        Pesaran (2015, 2021)
+  CDw:       Juodis, Reese (2021)
+  CDw+:      CDw with power enhancement from Fan et al. (2015)
+  CD*:       Pesaran, Xie (2021) with 4 PC(s)
+Variables are centered around zero.
+
+. 
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\Nebula PC\OneDrive\Desktop\HonoursProject\Log_Stata_CDtest_Crosscheck.log
+  log type:  text
+ closed on:  18 Apr 2026, 15:36:30
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
