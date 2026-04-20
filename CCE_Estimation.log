@@ -1,0 +1,626 @@
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\Nebula PC\OneDrive\Desktop\HonoursProject\CCE_Estimation.log
+  log type:  text
+ opened on:  20 Apr 2026, 14:51:48
+
+. 
+. clear all
+
+. set more off
+
+. 
+. * Import Excel file
+. import excel "Cabon_Emm_disaggregate.xlsx", firstrow clear
+(23 vars, 1,290 obs)
+
+. 
+. * Check data
+. describe
+
+Contains data
+ Observations:         1,290                  
+    Variables:            23                  
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+CountryName     str18   %18s                  Country.Name
+CountryCode     str3    %9s                   Country.Code
+OECD            str1    %9s                   OECD
+EU              str1    %9s                   EU
+G7              str1    %9s                   G7
+BRICS           str1    %9s                   BRICS
+CarbonTax       str1    %9s                   Carbon.Tax
+Year            int     %td..                 Year
+carbon_emissi~c double  %10.0g                carbon_emissions_pc
+gdp_pc          double  %10.0g                gdp_pc
+gdpsq_pc        double  %10.0g                gdpsq_pc
+fd_index        double  %10.0g                fd_index
+coal_producti~c double  %10.0g                coal_production_pc
+oil_productio~c double  %10.0g                oil_production_pc
+gas_productio~c double  %10.0g                gas_production_pc
+coal_consumpt~c double  %10.0g                coal_consumption_pc
+oil_consumpti~c double  %10.0g                oil_consumption_pc
+gas_consumpti~c double  %10.0g                gas_consumption_pc
+solar_product~c double  %10.0g                solar_production_pc
+wind_producti~c double  %10.0g                wind_production_pc
+hydro_product~c double  %10.0g                hydro_production_pc
+other_renewab~c double  %10.0g                other_renewables_production_pc
+renewables_co~c double  %10.0g                renewables_consumption_pc
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Sorted by: 
+     Note: Dataset has changed since last saved.
+
+. summarize
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+ CountryName |          0
+ CountryCode |          0
+        OECD |          0
+          EU |          0
+          G7 |          0
+-------------+---------------------------------------------------------
+       BRICS |          0
+   CarbonTax |          0
+        Year |      1,290       16254    3162.632      10958      21550
+carbon_emi~c |      1,290    1.951282    .6694381  -.4094458   3.471378
+      gdp_pc |      1,290    9.866685    .9732128   6.270796   11.62998
+-------------+---------------------------------------------------------
+    gdpsq_pc |      1,290    98.29789    18.44676   39.32288   135.2564
+    fd_index |      1,290    3.880818    .5798548  -.1953372    4.60517
+coal_produ~c |      1,290    7.469431    7.753329          0   18.83691
+oil_produc~c |      1,290    4.888112    7.487717          0   19.85476
+gas_produc~c |      1,290    6.069006    7.619637          0   19.27332
+-------------+---------------------------------------------------------
+coal_consu~c |      1,290    15.04664    2.581064          0     17.642
+oil_consum~c |      1,290    16.07892    2.590874          0    18.2014
+gas_consum~c |      1,290    14.62625    3.660165          0   17.27327
+solar_prod~c |      1,290    4.944571    4.490007  -.4306674   13.49004
+wind_produ~c |      1,290     7.78971    4.741898          0   14.83708
+-------------+---------------------------------------------------------
+hydro_prod~c |      1,290     12.5316    3.102803          0   17.54498
+other_rene~c |      1,290    10.17593    3.792038          0   16.65099
+renewables~c |      1,290    7.603944    2.132752          0   11.92935
+
+. 
+. * Panel Setup
+. encode CountryName, gen(country_id)
+
+. 
+. * Declare panel
+. xtset country_id Year
+
+Panel variable: country_id (strongly balanced)
+ Time variable: Year, 1/1/1990 to 1/1/2019, but with gaps
+         Delta: 1 day
+
+. 
+. * Install packages
+. capture which xtcsd
+
+. if _rc ssc install xtcsd
+
+. 
+. capture which xtcse2
+
+. if _rc net install xtdcce2, from("https://janditzen.github.io/xtdcce2/")
+
+. 
+. * Convert date variable to a simple year integer
+. gen year_int = year(Year)
+
+. 
+. * Create groups for heterogeneity check
+. destring G7 BRICS CarbonTax, replace force
+G7: all characters numeric; replaced as byte
+BRICS: all characters numeric; replaced as byte
+CarbonTax: all characters numeric; replaced as byte
+
+. 
+. gen group = .
+(1,290 missing values generated)
+
+. replace group = 1 if G7 == 1                                    // G7: N = 7
+(210 real changes made)
+
+. replace group = 2 if BRICS == 1                                 // BRICS: N = 5
+(150 real changes made)
+
+. replace group = 3 if CarbonTax == 1 & G7 == 0 & BRICS == 0      // CarbonTax non-G7/BRICS: N = 15
+(450 real changes made)
+
+. replace group = 4 if G7 == 0 & BRICS == 0 & CarbonTax == 0      // Other: N = 16
+(480 real changes made)
+
+. 
+. label define grouplbl 1 "G7" 2 "BRICS" 3 "Carbon tax (non-G7)" 4 "Other"
+
+. label values group grouplbl
+
+. 
+. * Verify country counts
+. preserve
+
+. bysort country_id: keep if _n == 1
+(1,247 observations deleted)
+
+. tab group
+
+              group |      Freq.     Percent        Cum.
+--------------------+-----------------------------------
+                 G7 |          7       16.28       16.28
+              BRICS |          5       11.63       27.91
+Carbon tax (non-G7) |         15       34.88       62.79
+              Other |         16       37.21      100.00
+--------------------+-----------------------------------
+              Total |         43      100.00
+
+. restore
+
+. 
+. 
+. * Rename variables with long names
+. rename coal_consumption_pc         coal_cons_pc
+
+. rename oil_consumption_pc          oil_cons_pc
+
+. rename gas_consumption_pc          gas_cons_pc
+
+. rename renewables_consumption_pc   ren_cons_pc
+
+. rename coal_production_pc          coal_prod_pc
+
+. rename oil_production_pc           oil_prod_pc
+
+. rename gas_production_pc           gas_prod_pc
+
+. rename solar_production_pc         solar_prod_pc
+
+. rename wind_production_pc          wind_prod_pc
+
+. rename hydro_production_pc         hydro_prod_pc
+
+. rename other_renewables_production_pc othren_prod_pc
+
+. 
+. * Declare the panel using the integer year
+. xtset country_id year_int
+
+Panel variable: country_id (strongly balanced)
+ Time variable: year_int, 1990 to 2019
+         Delta: 1 unit
+
+. 
+. * Pesaran CCE Test with cross-sectional averages on all. This CCE will break down.
+. // xtdcce2 carbon_emissions_pc ///
+. //     gdp_pc gdpsq_pc fd_index ///
+. //     coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc ///
+. //     coal_prod_pc oil_prod_pc gas_prod_pc ///
+. //     solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc, ///
+. //     crosssectional( ///
+. //         carbon_emissions_pc ///
+. //         gdp_pc gdpsq_pc ///
+. //         fd_index ///
+. //         coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc ///
+. //         coal_prod_pc oil_prod_pc gas_prod_pc ///
+. //         solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc ///
+. //     ) cr_lags(0) mgmissing
+.         
+. * Pesaran CCE Test cross-sectional averages only on carbon_emissions_pc gdp_pc fd_index
+. xtdcce2 carbon_emissions_pc ///
+>     gdp_pc gdpsq_pc fd_index ///
+>     coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc ///
+>     coal_prod_pc oil_prod_pc gas_prod_pc ///
+>     solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc, ///
+>     crosssectional(carbon_emissions_pc gdp_pc fd_index) cr_lags(0) mgmissing
+(Dynamic) Common Correlated Effects Estimator - Mean Group
+
+Panel Variable (i): country_id                        Number of obs     =       1290
+Time Variable (t): year_int                           Number of groups  =         43
+
+Degrees of freedom per group:                         Obs per group (T) =         30
+ without cross-sectional averages   = 15
+ with cross-sectional averages      = 12
+Number of                                             F(774, 516)       =       9.74
+ cross-sectional lags               0 to 0            Prob > F          =       0.00
+ variables in mean group regression = 602             R-squared         =       0.06
+ variables partialled out           = 172             R-squared (MG)    =       0.98
+                                                      Root MSE          =       0.02
+                                                      CD Statistic      =       2.43
+                                                         p-value        =     0.0151
+------------------------------------------------------------------------------------
+ carbon_emissions_pc|     Coef.   Std. Err.      z    P>|z|     [95% Conf. Interval]
+--------------------+---------------------------------------------------------------
+ Mean Group:        |
+              gdp_pc| -7.432649   2.560926   -2.90    0.004     -12.45197  -2.413327
+            fd_index|  .0075123   .0200954    0.37    0.709     -.0318738   .0468985
+            gdpsq_pc|  .3754862     .12387    3.03    0.002      .1327055   .6182669
+        coal_cons_pc|  .2424804   .0327587    7.40    0.000      .1782746   .3066862
+         oil_cons_pc|  .2980372   .0361998    8.23    0.000      .2270869   .3689875
+         gas_cons_pc|  .1841366   .0288388    6.39    0.000      .1276136   .2406596
+         ren_cons_pc|  .0153822   .1039176    0.15    0.882     -.1882925   .2190569
+        coal_prod_pc|  .0354177   .0154498    2.29    0.022      .0051366   .0656988
+         oil_prod_pc|  .0027484   .0118623    0.23    0.817     -.0205014   .0259981
+         gas_prod_pc| -.0076783   .0148328   -0.52    0.605     -.0367501   .0213934
+       solar_prod_pc| -.0005296   .0015032   -0.35    0.725     -.0034758   .0024166
+        wind_prod_pc|  .0254515   .0235205    1.08    0.279     -.0206479   .0715508
+       hydro_prod_pc| -.0712337   .0990583   -0.72    0.472     -.2653844    .122917
+      othren_prod_pc|   .020901   .0138499    1.51    0.131     -.0062444   .0480464
+------------------------------------------------------------------------------------
+Mean Group Variables: gdp_pc fd_index gdpsq_pc coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc coal_prod_pc oil_prod_pc gas_prod_pc solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc
+Cross Sectional Averaged Variables: carbon_emissions_pc gdp_pc fd_index 
+Heterogenous constant partialled out. 
+Warning:
+Collinearities detected. One or more individual coefficients are excluded from MG regression.
+Use estat ebistructure to display more details.
+
+. 
+. estat ebistructure
+Coefficient Structure from e(bi)
+  CSU gdp_pc  fd_index  gdpsq_pc  coal_cons_pc  oil_cons_pc  gas_cons_pc  ren_cons_pc  coal_prod_pc  oil_prod_pc  gas_prod_pc  solar_prod_pc  wind_prod_pc  hydro_prod_pc  othren_prod_pc 
+   1      1        1         1           1             1            1            1            1             1            1             1             1              1              1 
+   2      1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   3      1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   4      1        1         1           1             1            1            1            1             1            1             1             1              1              1 
+   5      1        1         1           1             1            1            1            1             1            1             1             1              1              1 
+   6      1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   7      1        1         1           1             1            1            1            1             1            1             1             1              1              1 
+   8      1        1         1           1             1            1            1            1             1            1             1             1              1              1 
+   9      1        1         1           0             0            0            0            0             0            0             0             0              0              0 
+   10     1        1         1           1             1            1            1            1             0            0             1             1              1              1 
+   11     1        1         1           1             1            1            1            0             1            1             1             1              1              1 
+   12     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   13     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   14     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   15     1        1         1           1             1            1            1            1             0            1             1             1              1              1 
+   16     1        1         1           1             1            1            1            1             0            0             1             1              1              1 
+   17     1        1         1           1             1            1            1            1             0            0             1             1              1              1 
+   18     1        1         1           1             1            0            1            0             0            0             0             1              1              1 
+   19     1        1         1           1             1            1            1            1             1            1             1             1              1              1 
+   20     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   21     1        1         1           1             1            1            1            0             0            1             1             1              1              1 
+   22     1        1         1           1             1            1            1            0             1            1             1             1              1              1 
+   23     1        1         1           1             1            1            1            1             0            0             1             1              1              1 
+   24     1        1         1           1             1            1            1            1             0            0             1             1              1              1 
+   25     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   26     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   27     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   28     1        1         1           1             1            1            1            1             1            1             1             1              1              1 
+   29     1        1         1           1             1            1            1            0             0            1             1             1              1              1 
+   30     1        1         1           1             1            1            1            1             0            0             1             1              1              1 
+   31     1        1         1           1             1            1            1            0             1            1             1             1              1              1 
+   32     1        1         1           1             1            1            1            1             0            1             1             1              1              1 
+   33     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   34     1        1         1           1             1            1            1            1             1            1             1             1              1              1 
+   35     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   36     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   37     1        1         1           1             1            1            1            1             0            0             1             1              1              1 
+   38     1        1         1           1             1            1            1            1             0            0             1             1              1              1 
+   39     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   40     1        1         1           1             1            1            1            0             0            0             1             1              1              1 
+   41     1        1         1           1             1            1            1            1             0            0             1             1              1              1 
+   42     1        1         1           1             1            1            1            1             1            1             1             1              1              1 
+   43     1        1         1           1             1            1            1            1             1            1             1             1              1              1 
+where CSU is the number of the cross section.
+1 implies coefficient is estimated.
+0 implies coefficient is zero.
+p implies coefficient is pooled.
+x implies coefficient is omitted (missing).
+
+. 
+. * Test if CD still exists
+. predict resid_cce, residuals
+
+. xtcd2 resid_cce
+
+Testing for cross-sectional dependence (CSD)
+     CD CDw CDw+                       CD*
+ H0: weak cross-section dependence     independence in presence of factors
+ H1: strong cross-section dependence   weak dependence in presence of factors
+------------------------------------------------------------------------
+               |    CD            CDw           CDw+          CD*
+---------------+--------------------------------------------------------
+resid_cce      |     2.43        1.20        665.35          0.39
+               |  (0.015)     (0.230)       (0.000)       (0.695)
+------------------------------------------------------------------------
+p-values in parenthesis.
+References
+  CD:        Pesaran (2015, 2021)
+  CDw:       Juodis, Reese (2021)
+  CDw+:      CDw with power enhancement from Fan et al. (2015)
+  CD*:       Pesaran, Xie (2021) with 4 PC(s)
+
+. xtcse2 resid_cce
+Cross-Sectional Dependence Exponent Estimation and Test
+
+Panel Variable (i): country_id
+Time Variable (t): year_int
+
+Estimation of Cross-Sectional Exponent (alpha)
+----------------------------------------------------------------
+       variable|     alpha   Std. Err.    [95% Conf. Interval]
+---------------+------------------------------------------------
+      resid_cce|  .6481531   .0443345      .561259    .7350471
+----------------------------------------------------------------
+0.5 <= alpha < 1 implies strong cross-sectional dependence.
+
+Testing for cross-sectional dependence (CSD)
+     CD CDw CDw+                       CD*
+ H0: weak cross-section dependence     independence in presence of factors
+ H1: strong cross-section dependence   weak dependence in presence of factors
+------------------------------------------------------------------------
+               |    CD            CDw           CDw+          CD*
+---------------+--------------------------------------------------------
+resid_cce      |     2.43       -0.69        663.46          0.39
+               |  (0.015)     (0.488)       (0.000)       (0.695)
+------------------------------------------------------------------------
+p-values in parenthesis.
+References
+  CD:        Pesaran (2015, 2021)
+  CDw:       Juodis, Reese (2021)
+  CDw+:      CDw with power enhancement from Fan et al. (2015)
+  CD*:       Pesaran, Xie (2021) with 4 PC(s)
+Variables are centered around zero.
+
+. 
+. * Carbon tax non-G7/BRICS (N = 15)
+. xtdcce2 carbon_emissions_pc ///
+>     gdp_pc gdpsq_pc fd_index ///
+>     coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc ///
+>     coal_prod_pc oil_prod_pc gas_prod_pc ///
+>     solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc ///
+>     if group == 3, ///
+>     crosssectional(carbon_emissions_pc gdp_pc fd_index) cr_lags(0)
+(Dynamic) Common Correlated Effects Estimator - Mean Group
+
+Panel Variable (i): country_id                        Number of obs     =        450
+Time Variable (t): year_int                           Number of groups  =         15
+
+Degrees of freedom per group:                         Obs per group (T) =         30
+ without cross-sectional averages   = 15
+ with cross-sectional averages      = 12
+Number of                                             F(270, 180)       =      12.96
+ cross-sectional lags               0 to 0            Prob > F          =       0.00
+ variables in mean group regression = 210             R-squared         =       0.05
+ variables partialled out           = 60              R-squared (MG)    =       0.98
+                                                      Root MSE          =       0.02
+                                                      CD Statistic      =       0.43
+                                                         p-value        =     0.6653
+------------------------------------------------------------------------------------
+ carbon_emissions_pc|     Coef.   Std. Err.      z    P>|z|     [95% Conf. Interval]
+--------------------+---------------------------------------------------------------
+ Mean Group:        |
+              gdp_pc| -4.967505   5.479688   -0.91    0.365      -15.7075   5.772487
+            fd_index|  -.012712   .0143048   -0.89    0.374     -.0407489   .0153248
+            gdpsq_pc|   .270382   .2663867    1.01    0.310     -.2517264   .7924904
+        coal_cons_pc|  .2431671   .0607292    4.00    0.000        .12414   .3621942
+         oil_cons_pc|  .2913756   .0674161    4.32    0.000      .1592425   .4235088
+         gas_cons_pc|  .1279495   .0346105    3.70    0.000      .0601142   .1957847
+         ren_cons_pc| -.0268742   .2156815   -0.12    0.901     -.4496021   .3958538
+        coal_prod_pc|  .0211019    .020273    1.04    0.298     -.0186324   .0608362
+         oil_prod_pc|  .0036735   .0259554    0.14    0.887     -.0471981   .0545452
+         gas_prod_pc|  .0083095    .011741    0.71    0.479     -.0147025   .0313214
+       solar_prod_pc| -.0011814   .0030284   -0.39    0.696     -.0071169   .0047541
+        wind_prod_pc|  .0722636   .0712582    1.01    0.311        -.0674   .2119271
+       hydro_prod_pc| -.0714462   .1727406   -0.41    0.679     -.4100115   .2671191
+      othren_prod_pc|  .0328623   .0388114    0.85    0.397     -.0432067   .1089313
+------------------------------------------------------------------------------------
+Mean Group Variables: gdp_pc fd_index gdpsq_pc coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc coal_prod_pc oil_prod_pc gas_prod_pc solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc
+Cross Sectional Averaged Variables: carbon_emissions_pc gdp_pc fd_index 
+Heterogenous constant partialled out. 
+Warning:
+Collinearities detected. One or more variables are dropped and coefficients set to zero. MG estimates will be affected. Consider option mgmissing.
+Use estat ebistructure to display more details.
+
+. estimates store cce_tax
+
+. 
+. * Non Carbon Tax, Non G7, Non BRICS(N = 16)
+. xtdcce2 carbon_emissions_pc ///
+>     gdp_pc gdpsq_pc fd_index ///
+>     coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc ///
+>     coal_prod_pc oil_prod_pc gas_prod_pc ///
+>     solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc ///
+>     if group == 4, ///
+>     crosssectional(carbon_emissions_pc gdp_pc fd_index) cr_lags(0)
+(Dynamic) Common Correlated Effects Estimator - Mean Group
+
+Panel Variable (i): country_id                        Number of obs     =        480
+Time Variable (t): year_int                           Number of groups  =         16
+
+Degrees of freedom per group:                         Obs per group (T) =         30
+ without cross-sectional averages   = 15
+ with cross-sectional averages      = 12
+Number of                                             F(288, 192)       =       6.90
+ cross-sectional lags               0 to 0            Prob > F          =       0.00
+ variables in mean group regression = 224             R-squared         =       0.09
+ variables partialled out           = 64              R-squared (MG)    =       0.97
+                                                      Root MSE          =       0.02
+                                                      CD Statistic      =       0.27
+                                                         p-value        =     0.7875
+------------------------------------------------------------------------------------
+ carbon_emissions_pc|     Coef.   Std. Err.      z    P>|z|     [95% Conf. Interval]
+--------------------+---------------------------------------------------------------
+ Mean Group:        |
+              gdp_pc| -5.513541   4.420224   -1.25    0.212     -14.17702   3.149938
+            fd_index|  .0723678   .0693133    1.04    0.296     -.0634837   .2082193
+            gdpsq_pc|  .2719759   .1998512    1.36    0.174     -.1197254   .6636771
+        coal_cons_pc|  .2244213   .0360095    6.23    0.000      .1538439   .2949986
+         oil_cons_pc|  .2627751   .0634556    4.14    0.000      .1384045   .3871457
+         gas_cons_pc|  .1753164   .0381992    4.59    0.000      .1004474   .2501854
+         ren_cons_pc| -.0937893    .050073   -1.87    0.061     -.1919306   .0043519
+        coal_prod_pc|  .0218249   .0090275    2.42    0.016      .0041313   .0395185
+         oil_prod_pc|  .0019812   .0019812    1.00    0.317     -.0019019   .0058643
+         gas_prod_pc|  .0066787   .0056997    1.17    0.241     -.0044925   .0178498
+       solar_prod_pc|  .0018571   .0017205    1.08    0.280      -.001515   .0052292
+        wind_prod_pc|  .0074849   .0031921    2.34    0.019      .0012285   .0137413
+       hydro_prod_pc|  .0601196   .0436148    1.38    0.168      -.025364   .1456031
+      othren_prod_pc|  .0207781    .012623    1.65    0.100     -.0039626   .0455188
+------------------------------------------------------------------------------------
+Mean Group Variables: gdp_pc fd_index gdpsq_pc coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc coal_prod_pc oil_prod_pc gas_prod_pc solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc
+Cross Sectional Averaged Variables: carbon_emissions_pc gdp_pc fd_index 
+Heterogenous constant partialled out. 
+Warning:
+Collinearities detected. One or more variables are dropped and coefficients set to zero. MG estimates will be affected. Consider option mgmissing.
+Use estat ebistructure to display more details.
+
+. estimates store cce_other
+
+. 
+. 
+. * G7 (N = 7)
+. xtdcce2 carbon_emissions_pc ///
+>     gdp_pc gdpsq_pc fd_index ///
+>     coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc ///
+>     coal_prod_pc oil_prod_pc gas_prod_pc ///
+>     solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc ///
+>     if group == 1, ///
+>     crosssectional(carbon_emissions_pc gdp_pc fd_index) cr_lags(0) 
+(Dynamic) Common Correlated Effects Estimator - Mean Group
+
+Panel Variable (i): country_id                        Number of obs     =        210
+Time Variable (t): year_int                           Number of groups  =          7
+
+Degrees of freedom per group:                         Obs per group (T) =         30
+ without cross-sectional averages   = 15
+ with cross-sectional averages      = 12
+Number of                                             F(126, 84)        =       9.18
+ cross-sectional lags               0 to 0            Prob > F          =       0.00
+ variables in mean group regression = 98              R-squared         =       0.07
+ variables partialled out           = 28              R-squared (MG)    =       0.99
+                                                      Root MSE          =       0.01
+                                                      CD Statistic      =       0.44
+                                                         p-value        =     0.6582
+------------------------------------------------------------------------------------
+ carbon_emissions_pc|     Coef.   Std. Err.      z    P>|z|     [95% Conf. Interval]
+--------------------+---------------------------------------------------------------
+ Mean Group:        |
+              gdp_pc| -2.118998   6.106304   -0.35    0.729     -14.08713   9.849138
+            fd_index|  .0414458   .0527575    0.79    0.432      -.061957   .1448485
+            gdpsq_pc|  .0967678   .2946817    0.33    0.743     -.4807977   .6743333
+        coal_cons_pc|  .1932292    .050058    3.86    0.000      .0951172   .2913411
+         oil_cons_pc|   .337599   .0539205    6.26    0.000      .2319167   .4432812
+         gas_cons_pc|  .2392886   .0238472   10.03    0.000       .192549   .2860282
+         ren_cons_pc|  .0009715   .0451828    0.02    0.983     -.0875852   .0895283
+        coal_prod_pc| -.0205062   .0134611   -1.52    0.128     -.0468894    .005877
+         oil_prod_pc|  .0064482   .0094756    0.68    0.496     -.0121237   .0250201
+         gas_prod_pc|  .0247266   .0203092    1.22    0.223     -.0150786   .0645319
+       solar_prod_pc| -.0014721   .0030023   -0.49    0.624     -.0073566   .0044124
+        wind_prod_pc| -.0036545   .0030271   -1.21    0.227     -.0095875   .0022785
+       hydro_prod_pc| -.0079569    .031026   -0.26    0.798     -.0687668    .052853
+      othren_prod_pc| -.0159896   .0185315   -0.86    0.388     -.0523106   .0203314
+------------------------------------------------------------------------------------
+Mean Group Variables: gdp_pc fd_index gdpsq_pc coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc coal_prod_pc oil_prod_pc gas_prod_pc solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc
+Cross Sectional Averaged Variables: carbon_emissions_pc gdp_pc fd_index 
+Heterogenous constant partialled out. 
+Warning:
+Collinearities detected. One or more variables are dropped and coefficients set to zero. MG estimates will be affected. Consider option mgmissing.
+Use estat ebistructure to display more details.
+
+. estimates store cce_g7
+
+. 
+. 
+. * BRICS (N = 5)
+. xtdcce2 carbon_emissions_pc ///
+>     gdp_pc gdpsq_pc fd_index ///
+>     coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc ///
+>     coal_prod_pc oil_prod_pc gas_prod_pc ///
+>     solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc ///
+>     if group == 2, ///
+>     crosssectional(carbon_emissions_pc gdp_pc fd_index) cr_lags(0) 
+(Dynamic) Common Correlated Effects Estimator - Mean Group
+
+Panel Variable (i): country_id                        Number of obs     =        150
+Time Variable (t): year_int                           Number of groups  =          5
+
+Degrees of freedom per group:                         Obs per group (T) =         30
+ without cross-sectional averages   = 15
+ with cross-sectional averages      = 12
+Number of                                             F(90, 60)         =      17.37
+ cross-sectional lags               0 to 0            Prob > F          =       0.00
+ variables in mean group regression = 70              R-squared         =       0.04
+ variables partialled out           = 20              R-squared (MG)    =       1.00
+                                                      Root MSE          =       0.02
+                                                      CD Statistic      =      -0.97
+                                                         p-value        =     0.3321
+------------------------------------------------------------------------------------
+ carbon_emissions_pc|     Coef.   Std. Err.      z    P>|z|     [95% Conf. Interval]
+--------------------+---------------------------------------------------------------
+ Mean Group:        |
+              gdp_pc| -2.828041   5.071059   -0.56    0.577     -12.76713   7.111051
+            fd_index| -.0667801   .0507293   -1.32    0.188     -.1662076   .0326474
+            gdpsq_pc|  .1779809   .2821614    0.63    0.528     -.3750454   .7310071
+        coal_cons_pc|  .2228387   .1406387    1.58    0.113     -.0528082   .4984856
+         oil_cons_pc|  .1134162     .18915    0.60    0.549      -.257311   .4841435
+         gas_cons_pc|  .0634151   .1542261    0.41    0.681     -.2388625   .3656927
+         ren_cons_pc| -.0650885   .2341109   -0.28    0.781     -.5239374   .3937604
+        coal_prod_pc|   .315472   .1468267    2.15    0.032      .0276969   .6032471
+         oil_prod_pc|  .1517704   .0989647    1.53    0.125     -.0421968   .3457375
+         gas_prod_pc| -.0788152    .068944   -1.14    0.253      -.213943   .0563125
+       solar_prod_pc| -.0020941   .0019593   -1.07    0.285     -.0059342    .001746
+        wind_prod_pc|  .0095362   .0054163    1.76    0.078     -.0010795   .0201519
+       hydro_prod_pc|   .006027   .1941553    0.03    0.975     -.3745104   .3865644
+      othren_prod_pc|  -.020295   .0225446   -0.90    0.368     -.0644816   .0238915
+------------------------------------------------------------------------------------
+Mean Group Variables: gdp_pc fd_index gdpsq_pc coal_cons_pc oil_cons_pc gas_cons_pc ren_cons_pc coal_prod_pc oil_prod_pc gas_prod_pc solar_prod_pc wind_prod_pc hydro_prod_pc othren_prod_pc
+Cross Sectional Averaged Variables: carbon_emissions_pc gdp_pc fd_index 
+Heterogenous constant partialled out. 
+Warning:
+Collinearities detected. One or more variables are dropped and coefficients set to zero. MG estimates will be affected. Consider option mgmissing.
+Use estat ebistructure to display more details.
+
+. estimates store cce_brics
+
+. 
+. 
+. * Table for comparison 
+. estimates table cce_g7 cce_brics cce_tax cce_other, ///
+>     b(%9.4f) se(%9.4f) ///
+>     title("CCEMG by country group")
+
+CCEMG by country group
+
+--------------------------------------------------------------
+    Variable |  cce_g7     cce_brics    cce_tax    cce_other  
+-------------+------------------------------------------------
+      gdp_pc |   -2.1190     -2.8280     -4.9675     -5.5135  
+             |    6.1063      5.0711      5.4797      4.4202  
+    fd_index |    0.0414     -0.0668     -0.0127      0.0724  
+             |    0.0528      0.0507      0.0143      0.0693  
+    gdpsq_pc |    0.0968      0.1780      0.2704      0.2720  
+             |    0.2947      0.2822      0.2664      0.1999  
+coal_cons_pc |    0.1932      0.2228      0.2432      0.2244  
+             |    0.0501      0.1406      0.0607      0.0360  
+ oil_cons_pc |    0.3376      0.1134      0.2914      0.2628  
+             |    0.0539      0.1892      0.0674      0.0635  
+ gas_cons_pc |    0.2393      0.0634      0.1279      0.1753  
+             |    0.0238      0.1542      0.0346      0.0382  
+ ren_cons_pc |    0.0010     -0.0651     -0.0269     -0.0938  
+             |    0.0452      0.2341      0.2157      0.0501  
+coal_prod_pc |   -0.0205      0.3155      0.0211      0.0218  
+             |    0.0135      0.1468      0.0203      0.0090  
+ oil_prod_pc |    0.0064      0.1518      0.0037      0.0020  
+             |    0.0095      0.0990      0.0260      0.0020  
+ gas_prod_pc |    0.0247     -0.0788      0.0083      0.0067  
+             |    0.0203      0.0689      0.0117      0.0057  
+solar_prod~c |   -0.0015     -0.0021     -0.0012      0.0019  
+             |    0.0030      0.0020      0.0030      0.0017  
+wind_prod_pc |   -0.0037      0.0095      0.0723      0.0075  
+             |    0.0030      0.0054      0.0713      0.0032  
+hydro_prod~c |   -0.0080      0.0060     -0.0714      0.0601  
+             |    0.0310      0.1942      0.1727      0.0436  
+othren_pro~c |   -0.0160     -0.0203      0.0329      0.0208  
+             |    0.0185      0.0225      0.0388      0.0126  
+--------------------------------------------------------------
+                                                  Legend: b/se
+
+.         
+. log close
+      name:  <unnamed>
+       log:  C:\Users\Nebula PC\OneDrive\Desktop\HonoursProject\CCE_Estimation.log
+  log type:  text
+ closed on:  20 Apr 2026, 14:51:49
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
