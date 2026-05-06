@@ -1,10 +1,9 @@
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
       name:  <unnamed>
        log:  C:\Users\Nebula PC\OneDrive\Desktop\HonoursProject\CCE_Estimations.log
   log type:  text
- opened on:  29 Apr 2026, 00:53:55
+ opened on:   6 May 2026, 10:22:32
 
-. 
 . clear all
 
 . set more off
@@ -21,10 +20,10 @@
 Contains data
  Observations:         1,290                  
     Variables:            26                  
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
 Variable      Storage   Display    Value
     name         type    format    label      Variable label
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
 CountryName     str18   %18s                  Country.Name
 CountryCode     str3    %9s                   Country.Code
 OECD            str1    %9s                   OECD
@@ -51,7 +50,7 @@ hydro_product~c double  %10.0g                hydro_production_pc
 other_renewab~c double  %10.0g                other_renewables_production_pc
 renewables_pr~c double  %10.0g                renewables_production_pc
 renewables_co~c double  %10.0g                renewables_consumption_pc
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
 Sorted by: 
      Note: Dataset has changed since last saved.
 
@@ -101,10 +100,13 @@ ren~ption_pc |      1,290    7.603944    2.132752          0   11.92935
 
 . if _rc ssc install xtcsd
 
-. 
 . capture which xtcse2
 
 . if _rc net install xtdcce2, from("https://janditzen.github.io/xtdcce2/")
+
+. capture which estout
+
+. if _rc ssc install estout
 
 . 
 . * Convert date variable to a simple year integer
@@ -125,7 +127,6 @@ G7: all characters numeric; replaced as byte
 BRICS: all characters numeric; replaced as byte
 CarbonTax: all characters numeric; replaced as byte
 
-. 
 . gen group = .
 (1,290 missing values generated)
 
@@ -141,23 +142,11 @@ CarbonTax: all characters numeric; replaced as byte
 . replace group = 4 if G7 == 0 & BRICS == 0 & CarbonTax == 0
 (480 real changes made)
 
-. 
 . label define grouplbl 1 "G7" 2 "BRICS" 3 "Carbon tax (non-G7)" 4 "Other"
 
 . label values group grouplbl
 
 . 
-. * Demeaning GDP
-. sum gdp_pc
-
-    Variable |        Obs        Mean    Std. dev.       Min        Max
--------------+---------------------------------------------------------
-      gdp_pc |      1,290    9.866685    .9732128   6.270796   11.62998
-
-. gen gdp_pc_dm = gdp_pc - r(mean)
-
-. gen gdpsq_pc_dm = gdp_pc_dm^2
-
 . 
 . * Declare the panel using the integer year
 . xtset country_id year_int
@@ -177,9 +166,49 @@ Panel variable: country_id (strongly balanced)
 . rename renewables_production_pc         ren_prod
 
 . 
+. summarize
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+ CountryName |          0
+ CountryCode |          0
+        OECD |          0
+          EU |          0
+          G7 |      1,290    .1627907    .3693178          0          1
+-------------+---------------------------------------------------------
+       BRICS |      1,290    .1162791    .3206836          0          1
+   CarbonTax |      1,290    .4418605    .4968009          0          1
+        Year |      1,290       16254    3162.632      10958      21550
+carbon_emi~c |      1,290    1.951282    .6694381  -.4094458   3.471378
+      gdp_pc |      1,290    9.866685    .9732128   6.270796   11.62998
+-------------+---------------------------------------------------------
+    gdpsq_pc |      1,290    98.29789    18.44676   39.32288   135.2564
+    fd_index |      1,290    3.880818    .5798548  -.1953372    4.60517
+coal_produ~c |      1,290    7.469431    7.753329          0   18.83691
+oil_produc~c |      1,290    4.888112    7.487717          0   19.85476
+gas_produc~c |      1,290    6.069006    7.619637          0   19.27332
+-------------+---------------------------------------------------------
+ fossil_prod |      1,290    9.776322     8.06682          0   20.13376
+coal_consu~c |      1,290    15.04664    2.581064          0     17.642
+oil_consum~c |      1,290    16.07892    2.590874          0    18.2014
+gas_consum~c |      1,290    14.62625    3.660165          0   17.27327
+ fossil_cons |      1,290     16.7725    2.667919          0   18.53201
+-------------+---------------------------------------------------------
+solar_prod~c |      1,290    4.944571    4.490007  -.4306674   13.49004
+wind_produ~c |      1,290     7.78971    4.741898          0   14.83708
+hydro_prod~c |      1,290     12.5316    3.102803          0   17.54498
+other_rene~c |      1,290    10.17593    3.792038          0   16.65099
+    ren_prod |      1,290    13.25202    2.816321          0   17.85528
+-------------+---------------------------------------------------------
+    ren_cons |      1,290    7.603944    2.132752          0   11.92935
+  country_id |      1,290          22    12.41449          1         43
+    year_int |      1,290      2004.5    8.658798       1990       2019
+       group |      1,290    2.930233    1.065621          1          4
+
+. 
 . * CCEMG Estimator
 . xtdcce2 carbon_emissions_pc ///
->     gdp_pc_dm gdpsq_pc_dm fd_index ///
+>     gdp_pc gdpsq_pc fd_index ///
 >     fossil_prod fossil_cons ///
 >     ren_prod ren_cons, ///
 >     crosssectional(_all) cr_lags(0) mgmissing
@@ -202,16 +231,16 @@ Number of                                             F(688, 602)       =       
  carbon_emissions_pc|     Coef.   Std. Err.      z    P>|z|     [95% Conf. Interval]
 --------------------+---------------------------------------------------------------
  Mean Group:        |
-            fd_index| -.0091028   .0199149   -0.46    0.648     -.0481353   .0299297
-         fossil_prod|  .0311522   .0260844    1.19    0.232     -.0199724   .0822768
-         fossil_cons|  .7993008    .056189   14.23    0.000      .6891723   .9094292
-            ren_prod| -.2248253   .1637754   -1.37    0.170     -.5458191   .0961686
-            ren_cons|  .2167894   .1673242    1.30    0.195     -.1111601   .5447388
-           gdp_pc_dm|  .4336839    .276371    1.57    0.117     -.1079934   .9753611
-         gdpsq_pc_dm|  .0915424   .1494157    0.61    0.540      -.201307   .3843918
+              gdp_pc| -1.372788   3.036554   -0.45    0.651     -7.324324   4.578748
+            gdpsq_pc|  .0915436   .1494151    0.61    0.540     -.2013046   .3843919
+            fd_index| -.0091028   .0199149   -0.46    0.648     -.0481354   .0299297
+         fossil_prod|  .0311522   .0260845    1.19    0.232     -.0199724   .0822768
+         fossil_cons|  .7993008    .056189   14.23    0.000      .6891724   .9094293
+            ren_prod| -.2248269   .1637749   -1.37    0.170     -.5458198   .0961659
+            ren_cons|  .2167911   .1673237    1.30    0.195     -.1111574   .5447396
 ------------------------------------------------------------------------------------
-Mean Group Variables: fd_index fossil_prod fossil_cons ren_prod ren_cons gdp_pc_dm gdpsq_pc_dm
-Cross Sectional Averaged Variables: carbon_emissions_pc fd_index fossil_prod fossil_cons ren_prod ren_cons gdp_pc_dm gdpsq_pc_dm 
+Mean Group Variables: gdp_pc gdpsq_pc fd_index fossil_prod fossil_cons ren_prod ren_cons
+Cross Sectional Averaged Variables: carbon_emissions_pc gdp_pc gdpsq_pc fd_index fossil_prod fossil_cons ren_prod ren_cons 
 Heterogenous constant partialled out. 
 Warning:
 Collinearities detected. One or more individual coefficients are excluded from MG regression.
@@ -230,8 +259,8 @@ Testing for cross-sectional dependence (CSD)
 ------------------------------------------------------------------------
                |    CD            CDw           CDw+          CD*
 ---------------+--------------------------------------------------------
-resid_ccemg    |    -1.21        0.42        803.14          0.37
-               |  (0.227)     (0.676)       (0.000)       (0.710)
+resid_ccemg    |    -1.21       -0.07        802.66          0.37
+               |  (0.227)     (0.944)       (0.000)       (0.710)
 ------------------------------------------------------------------------
 p-values in parenthesis.
 References
@@ -261,8 +290,8 @@ Testing for cross-sectional dependence (CSD)
 ------------------------------------------------------------------------
                |    CD            CDw           CDw+          CD*
 ---------------+--------------------------------------------------------
-resid_ccemg    |    -1.21       -1.69        801.04          0.37
-               |  (0.227)     (0.092)       (0.000)       (0.710)
+resid_ccemg    |    -1.21       -0.54        802.18          0.37
+               |  (0.227)     (0.587)       (0.000)       (0.710)
 ------------------------------------------------------------------------
 p-values in parenthesis.
 References
@@ -273,13 +302,12 @@ References
 Variables are centered around zero.
 
 . 
-. 
 . * CCE Pooled Estimator
 . xtdcce2 carbon_emissions_pc ///
->     gdp_pc_dm gdpsq_pc_dm fd_index ///
+>     gdp_pc gdpsq_pc fd_index ///
 >     fossil_prod fossil_cons ren_prod ren_cons, ///
 >     crosssectional(_all) cr_lags(0) ///
->     pooled(gdp_pc_dm gdpsq_pc_dm fd_index ///
+>     pooled(gdp_pc gdpsq_pc fd_index ///
 >         fossil_prod fossil_cons ren_prod ren_cons) ///
 >     mgmissing
 (Dynamic) Common Correlated Effects Estimator - Pooled 
@@ -301,22 +329,22 @@ Number of                                             F(394, 896)       =       
  carbon_emissions_pc|     Coef.   Std. Err.      z    P>|z|     [95% Conf. Interval]
 --------------------+---------------------------------------------------------------
  Pooled:            |
-           gdp_pc_dm|  .0537963   .1293201    0.42    0.677     -.1996664   .3072591
-         gdpsq_pc_dm|  .0000731    .040888    0.00    0.999      -.080066   .0802121
-            fd_index| -.0032953    .009967   -0.33    0.741     -.0228303   .0162397
-         fossil_prod| -.0084967   .0466772   -0.18    0.856     -.0999824    .082989
+              gdp_pc|  .0523546   .7366338    0.07    0.943     -1.391421    1.49613
+            gdpsq_pc|  .0000731   .0408878    0.00    0.999     -.0800655   .0802116
+            fd_index| -.0032953   .0099669   -0.33    0.741     -.0228301   .0162395
+         fossil_prod| -.0084967   .0466774   -0.18    0.856     -.0999827   .0829893
          fossil_cons|  .8933443   .0897269    9.96    0.000      .7174827   1.069206
-            ren_prod| -.0029998   .1578335   -0.02    0.985     -.3123478   .3063481
-            ren_cons| -.0052028    .147502   -0.04    0.972     -.2943013   .2838958
+            ren_prod| -.0029998   .1578346   -0.02    0.985     -.3123499   .3063502
+            ren_cons| -.0052028    .147503   -0.04    0.972     -.2943034   .2838978
 ------------------------------------------------------------------------------------
-Pooled Variables: gdp_pc_dm gdpsq_pc_dm fd_index fossil_prod fossil_cons ren_prod ren_cons
-Cross Sectional Averaged Variables: carbon_emissions_pc fd_index fossil_prod fossil_cons ren_prod ren_cons gdp_pc_dm gdpsq_pc_dm 
+Pooled Variables: gdp_pc gdpsq_pc fd_index fossil_prod fossil_cons ren_prod ren_cons
+Cross Sectional Averaged Variables: carbon_emissions_pc gdp_pc gdpsq_pc fd_index fossil_prod fossil_cons ren_prod ren_cons 
 Heterogenous constant partialled out. 
 
 . estimates store ccep_full
 
 .         
-. * Test CD 
+. * Test CD on CCEP residuals
 . predict resid_ccep, residuals
 
 . xtcd2 resid_ccep
@@ -328,8 +356,8 @@ Testing for cross-sectional dependence (CSD)
 ------------------------------------------------------------------------
                |    CD            CDw           CDw+          CD*
 ---------------+--------------------------------------------------------
-resid_ccep     |    -1.69       -0.41        889.86         -2.41
-               |  (0.091)     (0.680)       (0.000)       (0.016)
+resid_ccep     |    -1.69        1.09        891.36         -2.41
+               |  (0.091)     (0.276)       (0.000)       (0.016)
 ------------------------------------------------------------------------
 p-values in parenthesis.
 References
@@ -348,7 +376,7 @@ Estimation of Cross-Sectional Exponent (alpha)
 ----------------------------------------------------------------
        variable|     alpha   Std. Err.    [95% Conf. Interval]
 ---------------+------------------------------------------------
-     resid_ccep|         .          .            .           .
+     resid_ccep| -4.076697          .            .           .
 ----------------------------------------------------------------
 0.5 <= alpha < 1 implies strong cross-sectional dependence.
 
@@ -359,8 +387,8 @@ Testing for cross-sectional dependence (CSD)
 ------------------------------------------------------------------------
                |    CD            CDw           CDw+          CD*
 ---------------+--------------------------------------------------------
-resid_ccep     |    -1.69       -0.09        890.17         -2.41
-               |  (0.091)     (0.926)       (0.000)       (0.016)
+resid_ccep     |    -1.69        0.37        890.63         -2.41
+               |  (0.091)     (0.713)       (0.000)       (0.016)
 ------------------------------------------------------------------------
 p-values in parenthesis.
 References
@@ -371,10 +399,361 @@ References
 Variables are centered around zero.
 
 . 
+. * ---------------------- HETEROGENEITY ANALYSIS ------------------------------
+. * Compute cross-sectional averages from the FULL 43-country sample.
+. * We import these averages into the CCEP equation and run OLS filtered by each country subgroup.
+. foreach var of varlist carbon_emissions_pc gdp_pc gdpsq_pc fd_index ///
+>                        fossil_prod fossil_cons ren_prod ren_cons {
+  2.     bysort year_int: egen csa_`var' = mean(`var')
+  3. }
+
+. 
+. * Group-wise OLS augmented with full-sample CS averages.
+. 
+. * Group 1: G7
+. xtreg carbon_emissions_pc ///
+>     gdp_pc gdpsq_pc fd_index ///
+>     fossil_prod fossil_cons ren_prod ren_cons ///
+>     csa_carbon_emissions_pc csa_gdp_pc csa_gdpsq_pc csa_fd_index ///
+>     csa_fossil_prod csa_fossil_cons csa_ren_prod csa_ren_cons ///
+>     if group == 1, fe vce(cluster country_id)
+
+Fixed-effects (within) regression               Number of obs     =        210
+Group variable: country_id                      Number of groups  =          7
+
+R-squared:                                      Obs per group:
+     Within  = 0.9846                                         min =         30
+     Between = 0.9796                                         avg =       30.0
+     Overall = 0.9798                                         max =         30
+
+                                                F(6, 6)           =          .
+corr(u_i, Xb) = -0.3450                         Prob > F          =          .
+
+                                        (Std. err. adjusted for 7 clusters in country_id)
+-----------------------------------------------------------------------------------------
+                        |               Robust
+    carbon_emissions_pc | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------------+----------------------------------------------------------------
+                 gdp_pc |   .0522745   2.098188     0.02   0.981    -5.081806    5.186355
+               gdpsq_pc |  -.0091733   .0986996    -0.09   0.929    -.2506827     .232336
+               fd_index |   .0022139   .0242846     0.09   0.930    -.0572085    .0616362
+            fossil_prod |    .006456    .007629     0.85   0.430    -.0122115    .0251236
+            fossil_cons |   1.019223   .0662035    15.40   0.000      .857229    1.181217
+               ren_prod |  -.0452434    .089021    -0.51   0.629    -.2630698    .1725831
+               ren_cons |   .0365945   .0917793     0.40   0.704    -.1879813    .2611703
+csa_carbon_emissions_pc |    .659717   .3289131     2.01   0.092    -.1451044    1.464538
+             csa_gdp_pc |   .1547554   1.223285     0.13   0.903    -2.838515    3.148026
+           csa_gdpsq_pc |   .0012226   .0658413     0.02   0.986    -.1598851    .1623304
+           csa_fd_index |  -.0020738   .0228317    -0.09   0.931     -.057941    .0537933
+        csa_fossil_prod |   .0326941   .0170696     1.92   0.104    -.0090737    .0744619
+        csa_fossil_cons |  -.7957976   .3630932    -2.19   0.071    -1.684255    .0926594
+           csa_ren_prod |   .0801888   .0450519     1.78   0.125    -.0300492    .1904269
+           csa_ren_cons |  -.1318216   .0565322    -2.33   0.058    -.2701509    .0065077
+                  _cons |  -4.810856    12.8515    -0.37   0.721    -36.25734    26.63563
+------------------------+----------------------------------------------------------------
+                sigma_u |   .0630126
+                sigma_e |  .01549211
+                    rho |  .94299964   (fraction of variance due to u_i)
+-----------------------------------------------------------------------------------------
+
+. estimates store ols_g7
+
+. 
+. * Group 2: BRICS
+. xtreg carbon_emissions_pc ///
+>     gdp_pc gdpsq_pc fd_index ///
+>     fossil_prod fossil_cons ren_prod ren_cons ///
+>     csa_carbon_emissions_pc csa_gdp_pc csa_gdpsq_pc csa_fd_index ///
+>     csa_fossil_prod csa_fossil_cons csa_ren_prod csa_ren_cons ///
+>     if group == 2, fe vce(cluster country_id)
+
+Fixed-effects (within) regression               Number of obs     =        150
+Group variable: country_id                      Number of groups  =          5
+
+R-squared:                                      Obs per group:
+     Within  = 0.9893                                         min =         30
+     Between = 0.9797                                         avg =       30.0
+     Overall = 0.9805                                         max =         30
+
+                                                F(4, 4)           =          .
+corr(u_i, Xb) = 0.0534                          Prob > F          =          .
+
+                                        (Std. err. adjusted for 5 clusters in country_id)
+-----------------------------------------------------------------------------------------
+                        |               Robust
+    carbon_emissions_pc | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------------+----------------------------------------------------------------
+                 gdp_pc |    .562822   .2394422     2.35   0.078    -.1019761     1.22762
+               gdpsq_pc |  -.0327867   .0129901    -2.52   0.065    -.0688531    .0032797
+               fd_index |   .0770879   .0608283     1.27   0.274    -.0917986    .2459743
+            fossil_prod |  -.0148786   .0164998    -0.90   0.418    -.0606895    .0309323
+            fossil_cons |      .9537   .0707629    13.48   0.000     .7572306    1.150169
+               ren_prod |  -.2712582   .0754452    -3.60   0.023    -.4807276   -.0617889
+               ren_cons |   .2616622   .0823306     3.18   0.034     .0330759    .4902484
+csa_carbon_emissions_pc |   1.251069    .499004     2.51   0.066    -.1343886    2.636526
+             csa_gdp_pc |  -2.562684   3.584005    -0.72   0.514    -12.51348    7.388109
+           csa_gdpsq_pc |    .127949   .1861002     0.69   0.530    -.3887479    .6446459
+           csa_fd_index |  -.1267391   .1140695    -1.11   0.329     -.443447    .1899687
+        csa_fossil_prod |  -.0650649   .1229955    -0.53   0.625     -.406555    .2764253
+        csa_fossil_cons |  -1.048291   .4336294    -2.42   0.073    -2.252239    .1556574
+           csa_ren_prod |   .2967554   .0957177     3.10   0.036     .0310006    .5625103
+           csa_ren_cons |  -.1666943   .1096079    -1.52   0.203    -.4710147    .1376261
+                  _cons |   11.20893   20.79848     0.54   0.619    -46.53691    68.95476
+------------------------+----------------------------------------------------------------
+                sigma_u |  .13891537
+                sigma_e |  .02955301
+                    rho |   .9567009   (fraction of variance due to u_i)
+-----------------------------------------------------------------------------------------
+
+. estimates store ols_brics
+
+. 
+. * Group 3: Carbon tax (non-G7/BRICS)
+. xtreg carbon_emissions_pc ///
+>     gdp_pc gdpsq_pc fd_index ///
+>     fossil_prod fossil_cons ren_prod ren_cons ///
+>     csa_carbon_emissions_pc csa_gdp_pc csa_gdpsq_pc csa_fd_index ///
+>     csa_fossil_prod csa_fossil_cons csa_ren_prod csa_ren_cons ///
+>     if group == 3, fe vce(cluster country_id)
+
+Fixed-effects (within) regression               Number of obs     =        450
+Group variable: country_id                      Number of groups  =         15
+
+R-squared:                                      Obs per group:
+     Within  = 0.8925                                         min =         30
+     Between = 0.8851                                         avg =       30.0
+     Overall = 0.8848                                         max =         30
+
+                                                F(14, 14)         =          .
+corr(u_i, Xb) = -0.3297                         Prob > F          =          .
+
+                                       (Std. err. adjusted for 15 clusters in country_id)
+-----------------------------------------------------------------------------------------
+                        |               Robust
+    carbon_emissions_pc | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------------+----------------------------------------------------------------
+                 gdp_pc |  -1.019367   .5004841    -2.04   0.061    -2.092799    .0540649
+               gdpsq_pc |   .0544176    .027806     1.96   0.071    -.0052205    .1140556
+               fd_index |  -.0271063   .0112764    -2.40   0.031    -.0512918   -.0029209
+            fossil_prod |  -.0194395   .0291408    -0.67   0.516    -.0819403    .0430613
+            fossil_cons |   .9991683   .0517535    19.31   0.000      .888168    1.110168
+               ren_prod |   .0174335   .0067081     2.60   0.021     .0030461     .031821
+               ren_cons |  -.0319952   .0123344    -2.59   0.021    -.0584497   -.0055406
+csa_carbon_emissions_pc |   1.008999   .3971227     2.54   0.024     .1572555    1.860742
+             csa_gdp_pc |   3.737101   3.852715     0.97   0.349    -4.526152    12.00035
+           csa_gdpsq_pc |  -.1995873   .2003335    -1.00   0.336    -.6292599    .2300854
+           csa_fd_index |    .052131   .0491707     1.06   0.307    -.0533297    .1575917
+        csa_fossil_prod |  -.0177436   .0706732    -0.25   0.805    -.1693224    .1338353
+        csa_fossil_cons |  -1.023294   .2875567    -3.56   0.003    -1.640042   -.4065465
+           csa_ren_prod |  -.0639377   .0860904    -0.74   0.470    -.2485834    .1207079
+           csa_ren_cons |   .0685391   .0776252     0.88   0.392    -.0979503    .2350285
+                  _cons |  -11.96403   14.19873    -0.84   0.414    -42.41726    18.48921
+------------------------+----------------------------------------------------------------
+                sigma_u |  .19788266
+                sigma_e |  .05107236
+                    rho |  .93754754   (fraction of variance due to u_i)
+-----------------------------------------------------------------------------------------
+
+. estimates store ols_ctax
+
+. 
+. * Group 4: Other
+. xtreg carbon_emissions_pc ///
+>     gdp_pc gdpsq_pc fd_index ///
+>     fossil_prod fossil_cons ren_prod ren_cons ///
+>     csa_carbon_emissions_pc csa_gdp_pc csa_gdpsq_pc csa_fd_index ///
+>     csa_fossil_prod csa_fossil_cons csa_ren_prod csa_ren_cons ///
+>     if group == 4, fe vce(cluster country_id)
+
+Fixed-effects (within) regression               Number of obs     =        480
+Group variable: country_id                      Number of groups  =         16
+
+R-squared:                                      Obs per group:
+     Within  = 0.8897                                         min =         30
+     Between = 0.5915                                         avg =       30.0
+     Overall = 0.5699                                         max =         30
+
+                                                F(15, 15)         =  149187.48
+corr(u_i, Xb) = -0.9930                         Prob > F          =     0.0000
+
+                                       (Std. err. adjusted for 16 clusters in country_id)
+-----------------------------------------------------------------------------------------
+                        |               Robust
+    carbon_emissions_pc | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------------+----------------------------------------------------------------
+                 gdp_pc |   1.562222   .9714133     1.61   0.129    -.5082965     3.63274
+               gdpsq_pc |  -.0814044   .0530495    -1.53   0.146    -.1944767     .031668
+               fd_index |  -.0405202   .0308646    -1.31   0.209    -.1063066    .0252662
+            fossil_prod |   .0150106   .0061818     2.43   0.028     .0018345    .0281868
+            fossil_cons |   .9299689   .0907766    10.24   0.000     .7364831    1.123455
+               ren_prod |   .0258979   .0183139     1.41   0.178    -.0131372     .064933
+               ren_cons |  -.0787014   .0282904    -2.78   0.014    -.1390009   -.0184019
+csa_carbon_emissions_pc |   1.104248   .5447019     2.03   0.061    -.0567565    2.265253
+             csa_gdp_pc |  -3.038962   3.074642    -0.99   0.339    -9.592407    3.514483
+           csa_gdpsq_pc |   .1583948   .1618234     0.98   0.343    -.1865236    .5033132
+           csa_fd_index |   .0638298   .0845189     0.76   0.462    -.1163179    .2439776
+        csa_fossil_prod |  -.0138502    .092385    -0.15   0.883    -.2107641    .1830636
+        csa_fossil_cons |  -1.000206   .5429179    -1.84   0.085    -2.157408    .1569963
+           csa_ren_prod |  -.1288728   .0752336    -1.71   0.107    -.2892296    .0314839
+           csa_ren_cons |   .2108918   .1022001     2.06   0.057    -.0069425    .4287262
+                  _cons |   8.710554   17.22324     0.51   0.620    -27.99992    45.42103
+------------------------+----------------------------------------------------------------
+                sigma_u |  3.5646788
+                sigma_e |  .05073851
+                    rho |  .99979744   (fraction of variance due to u_i)
+-----------------------------------------------------------------------------------------
+
+. estimates store ols_other
+
+. 
+. * Comparison table 
+. esttab ccep_full ols_g7 ols_brics ols_ctax ols_other, ///
+>     b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) ///
+>     keep(gdp_pc gdpsq_pc fd_index fossil_prod fossil_cons ///
+>          ren_prod ren_cons) ///
+>     mtitles("Full CCEP" "G7" "BRICS" "Carbon Tax" "Other") ///
+>     title("Group-wise OLS Estimates Augmented with Cross-Sectional Averages") ///
+>     stats(N N_g r2_w, labels("Observations" "Countries" "Within R²")) ///
+> 
+
+Group-wise OLS Estimates Augmented with Cross-Sectional Averages
+--------------------------------------------------------------------------------------------
+                      (1)             (2)             (3)             (4)             (5)   
+                Full CCEP              G7           BRICS      Carbon Tax           Other   
+--------------------------------------------------------------------------------------------
+gdp_pc              0.052           0.052           0.563*         -1.019*          1.562   
+                  (0.737)         (2.098)         (0.239)         (0.500)         (0.971)   
+
+gdpsq_pc            0.000          -0.009          -0.033*          0.054*         -0.081   
+                  (0.041)         (0.099)         (0.013)         (0.028)         (0.053)   
+
+fd_index           -0.003           0.002           0.077          -0.027**        -0.041   
+                  (0.010)         (0.024)         (0.061)         (0.011)         (0.031)   
+
+fossil_prod        -0.008           0.006          -0.015          -0.019           0.015** 
+                  (0.047)         (0.008)         (0.016)         (0.029)         (0.006)   
+
+fossil_cons         0.893***        1.019***        0.954***        0.999***        0.930***
+                  (0.090)         (0.066)         (0.071)         (0.052)         (0.091)   
+
+ren_prod           -0.003          -0.045          -0.271**         0.017**         0.026   
+                  (0.158)         (0.089)         (0.075)         (0.007)         (0.018)   
+
+ren_cons           -0.005           0.037           0.262**        -0.032**        -0.079** 
+                  (0.148)         (0.092)         (0.082)         (0.012)         (0.028)   
+--------------------------------------------------------------------------------------------
+Observations     1290.000         210.000         150.000         450.000         480.000   
+Countries          43.000           7.000           5.000          15.000          16.000   
+Within R²                           0.985           0.989           0.892           0.890   
+--------------------------------------------------------------------------------------------
+Standard errors in parentheses
+* p<0.10, ** p<0.05, *** p<0.01
+
+. 
+. * CD tests on residuals from each group regression
+. display _newline "CD TESTS ON GROUP RESIDUALS"
+
+CD TESTS ON GROUP RESIDUALS
+
+. foreach grp in g7 brics ctax other {
+  2.     estimates restore ols_`grp'
+  3.     predict resid_`grp', e
+  4.     display _newline "--- `grp' ---"
+  5.     xtcd2 resid_`grp'
+  6. }
+(results ols_g7 are active now)
+(1,080 missing values generated)
+
+--- g7 ---
+Unbalanced panel detected, test adjusted.
+
+Testing for cross-sectional dependence (CSD)
+     CD CDw CDw+                       CD*
+ H0: weak cross-section dependence     independence in presence of factors
+ H1: strong cross-section dependence   weak dependence in presence of factors
+------------------------------------------------------------------------
+               |    CD            CDw           CDw+          CD*
+---------------+--------------------------------------------------------
+resid_g7       |    -0.30       -0.01         30.85         -2.46
+               |  (0.762)     (0.992)       (0.000)       (0.014)
+------------------------------------------------------------------------
+p-values in parenthesis.
+References
+  CD:        Pesaran (2015, 2021)
+  CDw:       Juodis, Reese (2021)
+  CDw+:      CDw with power enhancement from Fan et al. (2015)
+  CD*:       Pesaran, Xie (2021) with 4 PC(s)
+(results ols_brics are active now)
+(1,140 missing values generated)
+
+--- brics ---
+Unbalanced panel detected, test adjusted.
+
+Testing for cross-sectional dependence (CSD)
+     CD CDw CDw+                       CD*
+ H0: weak cross-section dependence     independence in presence of factors
+ H1: strong cross-section dependence   weak dependence in presence of factors
+------------------------------------------------------------------------
+               |    CD            CDw           CDw+          CD*
+---------------+--------------------------------------------------------
+resid_brics    |    -0.28        0.06          9.46         -3.23
+               |  (0.779)     (0.949)       (0.000)       (0.001)
+------------------------------------------------------------------------
+p-values in parenthesis.
+References
+  CD:        Pesaran (2015, 2021)
+  CDw:       Juodis, Reese (2021)
+  CDw+:      CDw with power enhancement from Fan et al. (2015)
+  CD*:       Pesaran, Xie (2021) with 4 PC(s)
+(results ols_ctax are active now)
+(840 missing values generated)
+
+--- ctax ---
+Unbalanced panel detected, test adjusted.
+
+Testing for cross-sectional dependence (CSD)
+     CD CDw CDw+                       CD*
+ H0: weak cross-section dependence     independence in presence of factors
+ H1: strong cross-section dependence   weak dependence in presence of factors
+------------------------------------------------------------------------
+               |    CD            CDw           CDw+          CD*
+---------------+--------------------------------------------------------
+resid_ctax     |    -0.42       -0.20        152.16         -1.10
+               |  (0.673)     (0.841)       (0.000)       (0.272)
+------------------------------------------------------------------------
+p-values in parenthesis.
+References
+  CD:        Pesaran (2015, 2021)
+  CDw:       Juodis, Reese (2021)
+  CDw+:      CDw with power enhancement from Fan et al. (2015)
+  CD*:       Pesaran, Xie (2021) with 4 PC(s)
+(results ols_other are active now)
+(810 missing values generated)
+
+--- other ---
+Unbalanced panel detected, test adjusted.
+
+Testing for cross-sectional dependence (CSD)
+     CD CDw CDw+                       CD*
+ H0: weak cross-section dependence     independence in presence of factors
+ H1: strong cross-section dependence   weak dependence in presence of factors
+------------------------------------------------------------------------
+               |    CD            CDw           CDw+          CD*
+---------------+--------------------------------------------------------
+resid_other    |    -0.72       -0.12        213.66         -0.69
+               |  (0.473)     (0.901)       (0.000)       (0.488)
+------------------------------------------------------------------------
+p-values in parenthesis.
+References
+  CD:        Pesaran (2015, 2021)
+  CDw:       Juodis, Reese (2021)
+  CDw+:      CDw with power enhancement from Fan et al. (2015)
+  CD*:       Pesaran, Xie (2021) with 4 PC(s)
+
 . 
 . log close
       name:  <unnamed>
        log:  C:\Users\Nebula PC\OneDrive\Desktop\HonoursProject\CCE_Estimations.log
   log type:  text
- closed on:  29 Apr 2026, 00:53:56
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ closed on:   6 May 2026, 10:22:34
+---------------------------------------------------------------------------------------------------------------------------------
