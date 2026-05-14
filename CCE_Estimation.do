@@ -1,4 +1,4 @@
-* log using "CCE_Estimations.log", replace
+*log using "CCE_Estimations.log", replace
 clear all
 set more off
 
@@ -46,7 +46,19 @@ rename fossil_fuel_consumption_pc 	fossil_cons
 rename renewables_consumption_pc 	ren_cons
 rename renewables_production_pc 	ren_prod
 
-summarize
+* Fixed effects panel
+xtreg carbon_emissions_pc ///
+    gdp_pc gdpsq_pc fd_index ///
+    fossil_prod fossil_cons ///
+    ren_prod ren_cons, ///
+    fe vce(cluster country_id)
+estimates store fe_full
+
+* Test CD on FE residuals
+predict resid_fe, e
+xtcd2 resid_fe
+xtcse2 resid_fe
+
 
 * CCEMG Estimator
 xtdcce2 carbon_emissions_pc ///
@@ -140,4 +152,4 @@ foreach grp in g7 brics ctax other {
     xtcd2 resid_`grp'
 }
 
-* log close
+*log close
