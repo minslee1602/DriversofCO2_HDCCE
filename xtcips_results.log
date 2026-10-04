@@ -1,0 +1,396 @@
+--------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/leminwater/Desktop/workfile/sep23empiricalresults/xtcips_results.log
+  log type:  text
+ opened on:   4 Oct 2026, 13:43:03
+
+. 
+. *--- 0. Settings  --------------------------------------------------
+. local datafile    "Final_Cabon_Emm_disaggregate_zscored.xlsx"
+
+. local idvar       "CountryCode"
+
+. local yearvar     "Year"
+
+. local taxvar      "CarbonTax"
+
+. local outcome     "carbon_emissions_pc"
+
+. local exclude     "carbon_emissions_pc_z"
+
+. local nyears      30     
+
+. local dropcountry "CRI"
+
+. local maxlags_list "1 2"
+
+. local bglags      2      // only used by xtcips for its own BG diagnostics
+
+. 
+. * Groups and deterministic specifications 
+. local g1name "All"
+
+. local g1cond "1==1"
+
+. local g2name "Carbon tax"
+
+. local g2cond "`taxvar'==1"
+
+. local g3name "No carbon tax"
+
+. local g3cond "`taxvar'==0"
+
+. 
+. local d1name "Intercept"
+
+. local d1opt  ""
+
+. local d2name "Intercept + trend"
+
+. local d2opt  "trend"
+
+. 
+. *--- 1. Install xtcips if needed -----------------------------------------------
+. capture which xtcips
+
+. if _rc ssc install xtcips
+
+. 
+. *--- 2. Load and prepare the data ----------------------------------------------
+. import excel using "`datafile'", firstrow clear
+(49 vars, 1,260 obs)
+
+. 
+. 
+. foreach v in `idvar' `yearvar' `taxvar' `outcome' {
+  2.     capture confirm variable `v'
+  3.     if _rc {
+  4.         display as error "Variable `v' not found. Edit the settings block. Variables present:"
+  5.         ds
+  6.         exit 111
+  7.     }
+  8. }
+
+. 
+. foreach v in `yearvar' `taxvar' `outcome' {
+  2.     capture confirm string variable `v'
+  3.     if !_rc {
+  4.         display as text "Converting `v' from text to numeric"
+  5.         destring `v', replace force
+  6.     }
+  7. }
+Converting CarbonTax from text to numeric
+CarbonTax: all characters numeric; replaced as byte
+
+. 
+. 
+. quietly levelsof `yearvar', local(yrs)
+
+. local nyr : word count `yrs'
+
+. local firstyear : word `=`nyr' - `nyears' + 1' of `yrs'
+
+. local lastyear  : word `nyr' of `yrs'
+
+. display as text "Sample window: `firstyear'-`lastyear'"
+Sample window: 10958-21550
+
+. 
+. keep if inrange(`yearvar', `firstyear', `lastyear')
+(0 observations deleted)
+
+. drop if `idvar' == "`dropcountry'"
+(0 observations deleted)
+
+. quietly count if !inlist(`taxvar', 0, 1)
+
+. if r(N) > 0 {
+.     display as error "`taxvar' has values other than 0/1 (or missing) after the sample restriction:"
+.     tab `taxvar', missing
+.     exit 198
+. }
+
+. egen id = group(`idvar')
+
+. * Use a plain 1..T time index for xtset. Year was imported with a date format
+. * (%td), and a daily-date time variable would make D. (first differences) look
+. * for the previous DAY instead of the previous year.
+. egen tidx = group(`yearvar')
+
+. xtset id tidx
+
+Panel variable: id (strongly balanced)
+ Time variable: tidx, 1 to 30
+         Delta: 1 unit
+
+. if "`r(balanced)'" != "strongly balanced" {
+.     display as error "Panel is not strongly balanced. Diagnostics:"
+.     xtdescribe
+.     bysort id: gen __n = _N
+.     display as error "Countries without exactly `nyears' observations in the window:"
+.     tab `idvar' if __n != `nyears'
+.     exit 459
+. }
+
+. quietly summarize id
+
+. display as text "Countries in panel: " r(max)
+Countries in panel: 42
+
+. 
+. ds *_z
+gdp_pc_z      gas_produc~z  solar_prod~z  imf_fi_acc~z  imf_fm_dep~z  wind_consu~z
+gdpsq_pc_z    coal_consu~z  wind_produ~z  imf_fi_dep~z  imf_fm_eff~z  other_rene..
+coal_produ~z  oil_consum~z  hydro_prod~z  imf_fi_eff~z  hydro_cons~z
+oil_produc~z  gas_consum~z  other_rene..  imf_fm_acc~z  solar_cons~z
+
+. local zvars `r(varlist)'
+
+. foreach v in `zvars' {
+  2.     capture confirm string variable `v'
+  3.     if !_rc {
+  4.         display as text "Converting `v' from text to numeric"
+  5.         destring `v', replace force
+  6.     }
+  7. }
+
+. local drivers : list zvars - exclude
+
+. local testvars `outcome' `drivers'
+
+. local ndrv : word count `drivers'
+
+. assert `ndrv' == 22
+
+. 
+. *--- 3. Run xtcips for every combination and collect the results ----------------
+. tempname H
+
+. tempfile res
+
+. postfile `H' str15 group str40 variable str16 transformation str18 deterministics ///
+>     int maxlags int n_used int n_total double cips cv01 cv05 cv10 using `res', replace
+(file /var/folders/jz/sb2gqv8n28b4_9j8gng93cv00000gn/T//S_26304.000001 not found)
+
+. 
+. foreach v of local testvars {
+  2.     foreach tr in "Level" "First difference" {
+  3. 
+.         capture drop __x __nmis __sd __ok
+  4.         if "`tr'" == "Level" {
+  5.             quietly gen double __x = `v'
+  6.             local expr "`v'"
+  7.         }
+  8.         else {
+  9.             quietly gen double __x = D.`v'
+ 10.             local expr "D.`v'"
+ 11.         }
+ 12. 
+.         * Country-level eligibility: no missing values and a non-constant series
+.         quietly {
+ 13.             bysort id: egen __nmis = total(missing(`v'))
+ 14.             bysort id: egen __sd   = sd(__x)
+ 15.             gen byte __ok = (__nmis == 0 & __sd > 1e-8 & __sd < .)
+ 16.             sort id tidx
+ 17.         }
+ 18. 
+.         forvalues g = 1/3 {
+ 19.             local gname "`g`g'name'"
+ 20.             local gcond "`g`g'cond'"
+ 21. 
+.             quietly {
+ 22.                 capture drop __t1 __t2
+ 23.                 egen __t1 = tag(id) if `gcond'
+ 24.                 egen __t2 = tag(id) if `gcond' & __ok == 1
+ 25.                 count if __t1 == 1
+ 26.                 local n_total = r(N)
+ 27.                 count if __t2 == 1
+ 28.                 local n_used = r(N)
+ 29.             }
+ 30. 
+.             forvalues d = 1/2 {
+ 31.                 local dname "`d`d'name'"
+ 32.                 local dopt  "`d`d'opt'"
+ 33. 
+.                 foreach ml of local maxlags_list {
+ 34. 
+.                     local cips = .
+ 35.                     local c1   = .
+ 36.                     local c5   = .
+ 37.                     local c10  = .
+ 38. 
+.                     if `n_used' >= 5 {
+ 39.                         capture quietly xtcips `expr' if `gcond' & __ok == 1, ///
+>                             maxlags(`ml') bglags(`bglags') `dopt'
+ 40.                         if _rc == 0 {
+ 41.                             local cips = r(cips)
+ 42.                             matrix CV  = r(cv)
+ 43.                             matrix CVv = vec(CV)
+ 44.                             * Assumed order of the critical values: 1%, 5%, 10%.
+.                             * Check once with -matrix list r(cv)- after a manual
+.                             * xtcips run and edit here if the layout differs.
+.                             if rowsof(CVv) == 3 {
+ 45.                                 local c1  = CVv[1,1]
+ 46.                                 local c5  = CVv[2,1]
+ 47.                                 local c10 = CVv[3,1]
+ 48.                             }
+ 49.                             else {
+ 50.                                 display as error "Unexpected r(cv) layout for `v' / `gname'"
+ 51.                             }
+ 52.                         }
+ 53.                     }
+ 54. 
+.                     post `H' ("`gname'") ("`v'") ("`tr'") ("`dname'") (`ml') ///
+>                         (`n_used') (`n_total') (`cips') (`c1') (`c5') (`c10')
+ 55.                 }
+ 56.             }
+ 57.         }
+ 58.     }
+ 59.     display as text "done: `v'"
+ 60. }
+done: carbon_emissions_pc
+done: gdp_pc_z
+done: gdpsq_pc_z
+done: coal_production_pc_z
+done: oil_production_pc_z
+done: gas_production_pc_z
+done: coal_consumption_pc_z
+done: oil_consumption_pc_z
+done: gas_consumption_pc_z
+done: solar_production_pc_z
+done: wind_production_pc_z
+done: hydro_production_pc_z
+done: other_renewables_production_pc_z
+done: imf_fi_access_z
+done: imf_fi_depth_z
+done: imf_fi_efficiency_z
+done: imf_fm_access_z
+done: imf_fm_depth_z
+done: imf_fm_efficiency_z
+done: hydro_consumption_pc_z
+done: solar_consumption_pc_z
+done: wind_consumption_pc_z
+done: other_renewable_consumption_pc_z
+
+. capture drop __x __nmis __sd __ok __t1 __t2
+
+. postclose `H'
+
+. 
+. *--- 4. Decisions and classification -------------------------------------------
+. use `res', clear
+
+. gen byte countries_dropped = n_total - n_used
+
+. gen byte reject_01 = cips < cv01 if !missing(cips, cv01)
+
+. gen byte reject_05 = cips < cv05 if !missing(cips, cv05)
+
+. gen byte reject_10 = cips < cv10 if !missing(cips, cv10)
+
+. label define yn 0 "No" 1 "Yes"
+
+. label values reject_01 reject_05 reject_10 yn
+
+. save "xtcips_results_all.dta", replace
+file xtcips_results_all.dta saved
+
+. 
+. * One row per group x variable x deterministics x maxlags (levels vs differences)
+. preserve
+
+. keep if transformation == "Level"
+(276 observations deleted)
+
+. keep group variable deterministics maxlags n_used n_total cips cv05 reject_05
+
+. rename (cips cv05 reject_05) (cips_level cv05_level rej05_level)
+
+. tempfile lvl
+
+. save `lvl'
+file /var/folders/jz/sb2gqv8n28b4_9j8gng93cv00000gn/T//S_26304.000003 saved as .dta format
+
+. restore
+
+. 
+. keep if transformation == "First difference"
+(276 observations deleted)
+
+. keep group variable deterministics maxlags cips cv05 reject_05
+
+. rename (cips cv05 reject_05) (cips_diff cv05_diff rej05_diff)
+
+. merge 1:1 group variable deterministics maxlags using `lvl', nogenerate
+(label yn already defined)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               276  
+    -----------------------------------------
+
+. 
+. gen str60 class_stata = "Not available"
+
+. replace class_stata = "Stationary in levels (I(0)-like)" if rej05_level == 1
+(105 real changes made)
+
+. replace class_stata = "Unit root in levels, stationary in differences (I(1)-like)" ///
+>     if rej05_level == 0 & rej05_diff == 1
+(171 real changes made)
+
+. replace class_stata = "Unit root in levels and differences (inconclusive)" ///
+>     if rej05_level == 0 & rej05_diff == 0
+(0 real changes made)
+
+. order group variable deterministics maxlags n_used n_total cips_level cv05_level ///
+>     cips_diff cv05_diff class_stata
+
+. sort group deterministics maxlags variable
+
+. 
+. display as text _newline "Classification counts (5% level):"
+
+Classification counts (5% level):
+
+. tab class_stata group if maxlags == 1 & deterministics == "Intercept"
+
+                      |              group
+          class_stata |       All  Carbon ..  No carb.. |     Total
+----------------------+---------------------------------+----------
+Stationary in level.. |        10          9          8 |        27 
+Unit root in levels.. |        13         14         15 |        42 
+----------------------+---------------------------------+----------
+                Total |        23         23         23 |        69 
+
+. tab class_stata group if maxlags == 1 & deterministics == "Intercept + trend"
+
+                      |              group
+          class_stata |       All  Carbon ..  No carb.. |     Total
+----------------------+---------------------------------+----------
+Stationary in level.. |         6          5          5 |        16 
+Unit root in levels.. |        17         18         18 |        53 
+----------------------+---------------------------------+----------
+                Total |        23         23         23 |        69 
+
+. 
+. save "xtcips_summary.dta", replace
+file xtcips_summary.dta saved
+
+. export excel using "xtcips_results.xlsx", sheet("Stata_summary") firstrow(variables) replace
+file xtcips_results.xlsx saved
+
+. use "xtcips_results_all.dta", clear
+
+. export excel using "xtcips_results.xlsx", sheet("Stata_all_tests") firstrow(variables) sheetreplace
+file xtcips_results.xlsx saved
+
+. 
+. 
+. log close
+      name:  <unnamed>
+       log:  /Users/leminwater/Desktop/workfile/sep23empiricalresults/xtcips_results.log
+  log type:  text
+ closed on:   4 Oct 2026, 13:48:47
+--------------------------------------------------------------------------------------------------------------
