@@ -20,3 +20,5 @@ stationarity_tests.do
 
 xtcips_results.xlsx, xtcips_results_all.dta, xtcips_summary.dta, xtcips_results.log
     Output of the do-file above
+
+Monte Carlo simulations are provided under releases: "Monte Carlo Replication Code" --> "hdcce_Simulations.zip"
